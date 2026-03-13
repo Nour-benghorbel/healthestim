@@ -185,6 +185,7 @@ def login_page():
                     st.error("❌ Identifiants incorrects.")
 
         st.caption("Comptes de démonstration : **admin / admin123**  •  **demo / demo2024**")
+
 # ── Load model ────────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
