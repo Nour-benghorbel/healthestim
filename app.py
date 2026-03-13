@@ -377,12 +377,17 @@ def simulator_page(model, cols):
 
 # ── Model page ────────────────────────────────────────────────────────────────
 def model_page():
-    st.markdown("<h1> Modèle & Éthique</h1>", unsafe_allow_html=True)
+    st.markdown("<h1>📘 Modèle & Éthique</h1>", unsafe_allow_html=True)
 
-    st.markdown("###  Modèle utilisé : Régression Linéaire")
+    # ─────────────────────────────────────────
+    # Modèle utilisé
+    # ─────────────────────────────────────────
+    st.markdown("### Modèle utilisé : Régression Linéaire")
     st.markdown("""
-    Nous utilisons une **Régression Linéaire** (scikit-learn) pour garantir la transparence totale
-    des prédictions. Chaque coefficient est interprétable directement.
+    Nous utilisons une **régression linéaire** (scikit-learn) afin de garantir
+    la **transparence** et l’**interprétabilité** des prédictions.
+    Chaque coefficient permet de comprendre l’effet d’une variable sur le coût estimé,
+    toutes choses égales par ailleurs.
     """)
 
     coefs = {
@@ -395,54 +400,117 @@ def model_page():
         "Région Sud-Est": -657.86,
         "Région Sud-Ouest": -809.80,
     }
-    coef_df = pd.DataFrame({"Variable": list(coefs.keys()), "Coefficient (€)": list(coefs.values())})
+
+    coef_df = pd.DataFrame({
+        "Variable": list(coefs.keys()),
+        "Coefficient (€)": list(coefs.values())
+    })
+
     st.dataframe(coef_df, use_container_width=True, hide_index=True)
 
+    st.info(
+        "Un coefficient positif indique une augmentation du coût prédit lorsque la variable augmente. "
+        "Un coefficient négatif indique une baisse du coût prédit."
+    )
+
+    # ─────────────────────────────────────────
+    # Performance du modèle
+    # ─────────────────────────────────────────
     col1, col2 = st.columns(2)
+
     with col1:
         st.markdown("""
         <div class='metric-card'>
-          <div style='color:#28A745;font-weight:600'> R² du modèle</div>
+          <div style='color:#28A745;font-weight:600'>R² du modèle</div>
           <div style='font-size:2rem;font-weight:700'>0.784</div>
           <div style='color:#666;font-size:.85rem'>sur le jeu de test (20%)</div>
-        </div>""", unsafe_allow_html=True)
+        </div>
+        """, unsafe_allow_html=True)
+
     with col2:
         st.markdown("""
         <div class='metric-card'>
-          <div style='color:#E63946;font-weight:600'> MAE</div>
+          <div style='color:#E63946;font-weight:600'>MAE</div>
           <div style='font-size:2rem;font-weight:700'>4 181 €</div>
           <div style='color:#666;font-size:.85rem'>erreur absolue moyenne</div>
-        </div>""", unsafe_allow_html=True)
+        </div>
+        """, unsafe_allow_html=True)
 
+    # ─────────────────────────────────────────
+    # Analyse des biais automatique
+    # ─────────────────────────────────────────
     st.markdown("---")
     st.markdown("### ⚖️ Analyse des biais")
-    st.markdown("""
-    | Groupe | Erreur moyenne (€) | Statut |
-    |--------|-------------------|--------|
-    | Non-fumeurs | -77 | ✅ Faible biais |
-    | Fumeurs | +87 | ⚠️ Légère sur-estimation |
-    | Région Nord-Est | +85 | ⚠️ Légère sur-estimation |
-    | Région Sud-Est | -275 | ⚠️ Sous-estimation |
 
-    **Solution proposée :** Calibrer le modèle séparément par région, ou utiliser un modèle
-    d'ensemble (Random Forest) avec contrainte d'équité (fairness constraint) pour réduire
-    les écarts systématiques entre groupes.
-    """)
+    st.write(
+        "L’analyse suivante est calculée automatiquement sur le jeu de test. "
+        "Une erreur moyenne **positive** signifie que le modèle tend à **surestimer** "
+        "les frais pour un groupe. Une erreur moyenne **négative** signifie qu’il tend "
+        "à **sous-estimer** les frais."
+    )
 
+    try:
+        bias_df = pd.read_csv("models/bias_report.csv")
+
+        st.dataframe(bias_df, use_container_width=True, hide_index=True)
+
+        st.markdown("""
+        **Interprétation :**
+        - une valeur proche de 0 indique un biais faible ;
+        - une valeur positive indique une tendance à la sur-estimation ;
+        - une valeur négative indique une tendance à la sous-estimation.
+        """)
+
+        st.markdown("""
+        **Solution proposée :**  
+        comparer ce modèle à un modèle plus flexible comme un **Random Forest Regressor**,
+        puis vérifier si l’amélioration de la performance permet aussi de réduire les écarts
+        d’erreur entre groupes.
+        """)
+
+    except FileNotFoundError:
+        st.warning(
+            "Le fichier `models/bias_report.csv` est introuvable. "
+            "Exécute d’abord `train_model.py` pour générer l’analyse automatique des biais."
+        )
+
+    # ─────────────────────────────────────────
+    # Conformité RGPD
+    # ─────────────────────────────────────────
     st.markdown("---")
     st.markdown("### 🔒 Conformité RGPD")
+
     st.markdown("""
     **Variables exclues du modèle :** `nom`, `prénom`, `email`, `téléphone`,
     `numéro de sécurité sociale`, `date de naissance`, `adresse IP`, `ville`, `code postal`.
 
-    Ces données sont des **données personnelles sensibles** au sens du RGPD (Art. 9).
-    Elles ne transitent jamais dans le pipeline de prédiction.
+    Ces informations sont des **données personnelles identifiantes** ou non nécessaires à la prédiction.
+    Elles ne transitent jamais dans le pipeline du modèle.
 
-    **Mesures d'accessibilité (RGAA/WCAG AA) :**
-    1.  **Contrastes de couleur** ≥ 4.5:1 sur tous les éléments de texte
-    2.  **Navigation clavier** complète avec indicateurs `focus` visibles
-    3.  **Attributs ARIA** (`role`, `aria-live`, `aria-label`) sur tous les composants dynamiques
+    **Mesures mises en place :**
+    1. **Minimisation des données** : seules les variables utiles à l’estimation sont utilisées.
+    2. **Transparence** : une notice de confidentialité est affichée avant l’accès à l’application.
+    3. **Sécurité** : l’accès est protégé par authentification et l’application est déployée en HTTPS.
     """)
+
+    # ─────────────────────────────────────────
+    # Accessibilité
+    # ─────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("### ♿ Accessibilité")
+
+    st.markdown("""
+    L’application respecte plusieurs principes d’accessibilité inspirés du **RGAA / WCAG AA** :
+
+    1. **Contrastes de couleur suffisants** pour garantir la lisibilité.
+    2. **Navigation clavier** avec focus visible sur les éléments interactifs.
+    3. **Libellés explicites et attributs ARIA** sur les composants dynamiques.
+    """)
+
+    st.caption(
+        "Cette page combine explicabilité du modèle, vigilance sur les biais, "
+        "protection des données et accessibilité."
+    )
 
 # ── Logs page ─────────────────────────────────────────────────────────────────
 def logs_page():
