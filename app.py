@@ -24,6 +24,8 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+
+
 # ── CSS accessible (RGAA/WCAG AA) ────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -79,49 +81,122 @@ def check_login(username: str, password: str) -> bool:
     return USERS.get(username) == h
 
 def login_page():
-    st.markdown("<h1>🏥 HealthEstim</h1>", unsafe_allow_html=True)
+
+    if "rgpd_accepted" not in st.session_state:
+        st.session_state["rgpd_accepted"] = False
+
+    st.markdown("<h1> HealthEstim</h1>", unsafe_allow_html=True)
     st.markdown("<p>Simulateur éthique de frais médicaux</p>", unsafe_allow_html=True)
+
     col1, col2, col3 = st.columns([1,2,1])
+
     with col2:
-        st.markdown("### 🔐 Connexion")
-        # RGPD banner
-        st.markdown("""
-        <div class='rgpd-banner' role='alert' aria-live='polite'>
-        <b>🍪 Politique de confidentialité (RGPD)</b><br>
-        Cette application ne collecte aucune donnée personnelle identifiable.
-        Les simulations sont traitées localement et ne sont pas conservées.
-        En vous connectant, vous acceptez nos <a href='#' aria-label='Conditions générales'>CGU</a>.
-        </div>
-        """, unsafe_allow_html=True)
-        with st.form("login_form"):
-            username = st.text_input("Nom d'utilisateur", autocomplete="username",
-                                     help="Utilisez : admin / demo")
-            password = st.text_input("Mot de passe", type="password",
-                                     autocomplete="current-password")
-            submitted = st.form_submit_button("Se connecter", use_container_width=True)
-            if submitted:
-                if check_login(username, password):
-                    st.session_state["logged_in"] = True
-                    st.session_state["username"] = username
-                    logger.info("LOGIN_SUCCESS | user=%s", username)
+
+        # ─────────────────────────────────────────
+        # ÉTAPE 1 : consentement RGPD obligatoire
+        # ─────────────────────────────────────────
+        if not st.session_state["rgpd_accepted"]:
+
+            st.markdown("### Notice de confidentialité")
+
+            st.markdown("""
+            <div class='rgpd-banner' role='alert' aria-live='polite'>
+            <b>Protection des données personnelles</b><br><br>
+
+            Cette application permet uniquement de <b>simuler une estimation de frais médicaux</b>.
+
+            <br><br>
+
+            <b>Données utilisées pour la simulation :</b>
+            âge, IMC, nombre d'enfants, statut fumeur, sexe, région.
+
+            <br><br>
+
+            <b>Données non utilisées :</b>
+            aucune donnée personnelle identifiable (nom, email, téléphone, etc.).
+
+            <br><br>
+
+            <b>Conservation :</b>
+            les données saisies dans le simulateur ne sont pas enregistrées et
+            ne sont utilisées que pour la session en cours.
+
+            <br><br>
+
+            Le résultat affiché constitue uniquement une <b>estimation automatique</b>.
+            </div>
+            """, unsafe_allow_html=True)
+
+            consent = st.checkbox(
+                "J’ai lu la notice de confidentialité et j’accepte de poursuivre."
+            )
+
+            if st.button("Continuer vers la connexion", use_container_width=True):
+
+                if consent:
+                    st.session_state["rgpd_accepted"] = True
+                    logger.info("RGPD_NOTICE_ACCEPTED")
                     st.rerun()
                 else:
+                    st.warning("Vous devez accepter la notice pour continuer.")
+
+            return
+
+        # ─────────────────────────────────────────
+        # ÉTAPE 2 : page de connexion
+        # ─────────────────────────────────────────
+
+        st.markdown("### Connexion")
+
+        with st.form("login_form"):
+
+            username = st.text_input(
+                "Nom d'utilisateur",
+                autocomplete="username",
+                help="Utilisez : admin ou demo"
+            )
+
+            password = st.text_input(
+                "Mot de passe",
+                type="password",
+                autocomplete="current-password"
+            )
+
+            submitted = st.form_submit_button(
+                "Se connecter",
+                use_container_width=True
+            )
+
+            if submitted:
+
+                if check_login(username, password):
+
+                    st.session_state["logged_in"] = True
+                    st.session_state["username"] = username
+
+                    logger.info("LOGIN_SUCCESS | user=%s", username)
+
+                    st.success("Connexion réussie")
+                    st.rerun()
+
+                else:
+
                     logger.warning("LOGIN_FAIL | user=%s", username)
                     st.error("❌ Identifiants incorrects.")
-        st.caption("Comptes de démo : **admin** / admin123  •  **demo** / demo2024")
 
+        st.caption("Comptes de démonstration : **admin / admin123**  •  **demo / demo2024**")
 # ── Load model ────────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
-    with open("model_lr.pkl", "rb") as f:
+    with open("models/model_lr.pkl", "rb") as f:
         model = pickle.load(f)
-    with open("feature_cols.json") as f:
+    with open("models/feature_cols.json") as f:
         cols = json.load(f)
     return model, cols
 
 @st.cache_data
 def load_data():
-    df = pd.read_csv("insurance_data.csv")
+    df = pd.read_csv("data/insurance_data.csv")
     return df
 
 # ── Prediction ────────────────────────────────────────────────────────────────
@@ -140,16 +215,16 @@ def predict(model, cols, age, bmi, children, smoker, sex, region):
 
 # ── Dashboard page ────────────────────────────────────────────────────────────
 def dashboard_page(df):
-    st.markdown("<h1>📊 Dashboard – Analyse des frais médicaux</h1>", unsafe_allow_html=True)
+    st.markdown("<h1> Dashboard – Analyse des frais médicaux</h1>", unsafe_allow_html=True)
     st.caption("Données anonymisées – aucune information personnelle affichée")
 
     # KPIs
     col1, col2, col3, col4 = st.columns(4)
     metrics = [
-        ("👥 Clients", f"{len(df):,}".replace(",","  "), "#0055A4"),
-        ("💶 Frais moyens", f"{df['charges'].mean():,.0f} €", "#28A745"),
-        ("🚬 Fumeurs", f"{(df['smoker']=='yes').sum()} ({(df['smoker']=='yes').mean()*100:.0f}%)", "#E63946"),
-        ("📊 IMC moyen", f"{df['bmi'].mean():.1f}", "#FFC107"),
+        ("Clients", f"{len(df):,}".replace(",","  "), "#0055A4"),
+        (" Frais moyens", f"{df['charges'].mean():,.0f} €", "#28A745"),
+        (" Fumeurs", f"{(df['smoker']=='yes').sum()} ({(df['smoker']=='yes').mean()*100:.0f}%)", "#E63946"),
+        (" IMC moyen", f"{df['bmi'].mean():.1f}", "#FFC107"),
     ]
     for col, (label, val, color) in zip([col1,col2,col3,col4], metrics):
         with col:
@@ -165,13 +240,13 @@ def dashboard_page(df):
     col_left, col_right = st.columns(2)
 
     with col_left:
-        st.markdown("#### 💶 Distribution des frais médicaux")
+        st.markdown("####  Distribution des frais médicaux")
         hist = df.assign(tranche=pd.cut(df["charges"], bins=20)).groupby("tranche", observed=True)["charges"].count().rename("Nombre de clients")
         hist.index = [f"{int(i.left/1000)}k-{int(i.right/1000)}k €" for i in hist.index]
         st.bar_chart(hist, height=280)
 
     with col_right:
-        st.markdown("#### 🚬 Frais moyens : fumeurs vs non-fumeurs")
+        st.markdown("####  Frais moyens : fumeurs vs non-fumeurs")
         comp = df.groupby("smoker")["charges"].mean().reset_index()
         comp["smoker"] = comp["smoker"].map({"yes": "Fumeur", "no": "Non-fumeur"})
         comp = comp.set_index("smoker")
@@ -200,7 +275,7 @@ def dashboard_page(df):
     }, use_container_width=True, height=350)
 
     # IMC vs charges
-    st.markdown("#### 📐 IMC × Frais médicaux")
+    st.markdown("####  IMC × Frais médicaux")
     st.vega_lite_chart(sample, {
         "mark": {"type": "circle", "opacity": 0.65, "size": 55},
         "encoding": {
@@ -256,7 +331,7 @@ def simulator_page(model, cols):
 
             st.markdown(f"""
             <div class='result-box' role='status' aria-live='polite'>
-              💶 {pred:,.0f} € / an
+             {pred:,.0f} € / an
               <div style='font-size:.9rem;font-weight:400;margin-top:.4rem'>
                 estimation annuelle de vos frais médicaux
               </div>
@@ -265,7 +340,7 @@ def simulator_page(model, cols):
 
             # Breakdown
             monthly = pred / 12
-            st.metric("📅 Estimation mensuelle", f"{monthly:,.0f} €")
+            st.metric(" Estimation mensuelle", f"{monthly:,.0f} €")
 
             # IMC category
             if bmi < 18.5:    bmi_cat, bmi_col = "Insuffisance pondérale", "#17A2B8"
@@ -279,13 +354,13 @@ def simulator_page(model, cols):
             if smoker == "Oui":
                 st.markdown("""
                 <div class='warning-bias' role='alert'>
-                ⚠️ <b>Note sur les biais :</b> Le statut fumeur a un poids très élevé dans le modèle
+                 <b>Note sur les biais :</b> Le statut fumeur a un poids très élevé dans le modèle
                 (+23 651 € en moyenne). Ce coefficient reflète une réalité actuarielle mais peut
                 pénaliser certains profils. Nous recommandons une revue humaine pour les cas limites.
                 </div>""", unsafe_allow_html=True)
 
             # Contributions
-            st.markdown("#### 📊 Facteurs influençant votre estimation")
+            st.markdown("####  Facteurs influençant votre estimation")
             contribs = {
                 "Âge": 256.98 * age,
                 "IMC": 337.09 * bmi,
@@ -298,13 +373,13 @@ def simulator_page(model, cols):
                 "Contribution (€)", ascending=False)
             st.bar_chart(contrib_df.set_index("Facteur"), height=220)
         else:
-            st.info("👈 Renseignez vos informations et cliquez sur **Simuler**.")
+            st.info(" Renseignez vos informations et cliquez sur **Simuler**.")
 
 # ── Model page ────────────────────────────────────────────────────────────────
 def model_page():
-    st.markdown("<h1>🤖 Modèle & Éthique</h1>", unsafe_allow_html=True)
+    st.markdown("<h1> Modèle & Éthique</h1>", unsafe_allow_html=True)
 
-    st.markdown("### 📐 Modèle utilisé : Régression Linéaire")
+    st.markdown("###  Modèle utilisé : Régression Linéaire")
     st.markdown("""
     Nous utilisons une **Régression Linéaire** (scikit-learn) pour garantir la transparence totale
     des prédictions. Chaque coefficient est interprétable directement.
@@ -327,14 +402,14 @@ def model_page():
     with col1:
         st.markdown("""
         <div class='metric-card'>
-          <div style='color:#28A745;font-weight:600'>📈 R² du modèle</div>
+          <div style='color:#28A745;font-weight:600'> R² du modèle</div>
           <div style='font-size:2rem;font-weight:700'>0.784</div>
           <div style='color:#666;font-size:.85rem'>sur le jeu de test (20%)</div>
         </div>""", unsafe_allow_html=True)
     with col2:
         st.markdown("""
         <div class='metric-card'>
-          <div style='color:#E63946;font-weight:600'>📉 MAE</div>
+          <div style='color:#E63946;font-weight:600'> MAE</div>
           <div style='font-size:2rem;font-weight:700'>4 181 €</div>
           <div style='color:#666;font-size:.85rem'>erreur absolue moyenne</div>
         </div>""", unsafe_allow_html=True)
@@ -364,16 +439,16 @@ def model_page():
     Elles ne transitent jamais dans le pipeline de prédiction.
 
     **Mesures d'accessibilité (RGAA/WCAG AA) :**
-    1. 🎨 **Contrastes de couleur** ≥ 4.5:1 sur tous les éléments de texte
-    2. ⌨️ **Navigation clavier** complète avec indicateurs `focus` visibles
-    3. 🔊 **Attributs ARIA** (`role`, `aria-live`, `aria-label`) sur tous les composants dynamiques
+    1.  **Contrastes de couleur** ≥ 4.5:1 sur tous les éléments de texte
+    2.  **Navigation clavier** complète avec indicateurs `focus` visibles
+    3.  **Attributs ARIA** (`role`, `aria-live`, `aria-label`) sur tous les composants dynamiques
     """)
 
 # ── Logs page ─────────────────────────────────────────────────────────────────
 def logs_page():
-    st.markdown("<h1>📋 Journaux d'activité</h1>", unsafe_allow_html=True)
+    st.markdown("<h1> Journaux d'activité</h1>", unsafe_allow_html=True)
     if st.session_state.get("username") != "admin":
-        st.warning("⚠️ Accès réservé à l'administrateur.")
+        st.warning(" Accès réservé à l'administrateur.")
         return
     try:
         with open("app.log") as f:
@@ -396,30 +471,30 @@ def main():
 
     # Sidebar
     with st.sidebar:
-        st.markdown(f"### 🏥 HealthEstim")
+        st.markdown(f"###  HealthEstim")
         st.markdown(f"Connecté : **{st.session_state['username']}**")
         st.markdown("---")
-        page = st.radio("Navigation", ["📊 Dashboard", "🧮 Simulateur", "🤖 Modèle & Éthique", "📋 Logs"],
+        page = st.radio("Navigation", [" Dashboard", " Simulateur", " Modèle & Éthique", " Logs"],
                         label_visibility="collapsed")
         st.markdown("---")
         st.markdown("""
         <div style='font-size:.75rem;color:#666'>
-        🔒 Données anonymisées<br>
+         Données anonymisées<br>
         🇪🇺 Conforme RGPD<br>
-        ♿ Accessible WCAG AA
+         Accessible WCAG AA
         </div>""", unsafe_allow_html=True)
-        if st.button("🚪 Déconnexion"):
+        if st.button(" Déconnexion"):
             logger.info("LOGOUT | user=%s", st.session_state["username"])
             st.session_state.clear()
             st.rerun()
 
-    if page == "📊 Dashboard":
+    if page == " Dashboard":
         dashboard_page(df)
-    elif page == "🧮 Simulateur":
+    elif page == " Simulateur":
         simulator_page(model, cols)
-    elif page == "🤖 Modèle & Éthique":
+    elif page == " Modèle & Éthique":
         model_page()
-    elif page == "📋 Logs":
+    elif page == " Logs":
         logs_page()
 
 if __name__ == "__main__":

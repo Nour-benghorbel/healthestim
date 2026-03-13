@@ -1,40 +1,42 @@
-# HealthEstim – Simulateur éthique de frais médicaux
+# HealthEstim - Simulateur éthique de frais médicaux
+
+## Description
+HealthEstim est une application Streamlit permettant d'estimer les frais médicaux annuels
+d'un futur client à partir de variables non directement identifiantes.
+
+Le projet répond aux exigences suivantes :
+- modèle de régression interprétable ;
+- tableau de bord interactif ;
+- formulaire de simulation ;
+- authentification simple ;
+- gestion des logs ;
+- prise en compte de la conformité RGPD ;
+- mesures d'accessibilité inspirées du RGAA / WCAG.
 
 ## Structure du projet
-```
-├── app.py               # Application Streamlit principale
-├── requirements.txt     # Dépendances Python
-├── insurance_data.csv   # Dataset (anonymisé pour le modèle)
-├── model_lr.pkl         # Modèle Régression Linéaire entraîné
-├── feature_cols.json    # Colonnes du modèle
-└── app.log              # Journaux (généré automatiquement)
-```
-
-## Lancement local
 ```bash
-pip install -r requirements.txt
-streamlit run app.py
-```
+HEALTH-INSURTECH_PROJECT/
+├── .streamlit/
+│   └── config.toml
+├── assets/
+│   └── style.css
+├── data/
+│   └── insurance_data.csv
+├── models/
+│   ├── model_lr.pkl
+│   └── feature_cols.json
+├── pages/
+│   ├── dashboard.py
+│   ├── logs.py
+│   ├── model_ethics.py
+│   └── simulator.py
+├── utils/
+│   ├── auth.py
+│   ├── logger.py
+│   └── predict.py
+├── app.py
+├── config.py
+├── README.md
+└── requirements.txt
 
-## Déploiement Streamlit Cloud
-1. Créer un repo GitHub avec ces fichiers
-2. Aller sur https://share.streamlit.io
-3. Connecter le repo → sélectionner `app.py`
-4. Déployer → URL publique HTTPS générée automatiquement
 
-## Comptes de démo
-| Utilisateur | Mot de passe | Rôle |
-|-------------|-------------|------|
-| admin       | admin123    | Admin (accès logs) |
-| demo        | demo2024    | Utilisateur standard |
-
-## Conformité RGPD
-- Aucune donnée PII dans le modèle (NSS, email, IP, nom/prénom exclus)
-- Bannière consentement à la connexion
-- Logs sans données personnelles
-- Simulation locale (aucune persistance)
-
-## Accessibilité WCAG AA
-1. Contrastes ≥ 4.5:1 (texte sur fond)
-2. Navigation clavier avec focus visible
-3. Attributs ARIA sur composants dynamiques

@@ -1,0 +1,27 @@
+:root {
+    --primary: #0055A4;
+    --secondary: #F8F9FA;
+    --text: #1A1A2E;
+    --warning: #FFC107;
+}
+
+html,
+body,
+[class*="css"] {
+    font-family: "Segoe UI", sans-serif;
+    color: var(--text);
+}
+
+h1,
+h2,
+h3 {
+    color: var(--primary);
+}
+
+button:focus,
+input:focus,
+select:focus,
+textarea:focus {
+    outline: 3px solid var(--warning) !important;
+    outline-offset: 2px !important;
+}
